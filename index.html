@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>福岡旅遊行程</title>
+    
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- FontAwesome Pro Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            /* Starlux Inspired Palette */
+            --primary: #00254d;
+            --primary-light: #003a70;
+            --gold: #bfa15f;
+            --gold-light: #e0c889;
+            --accent: #c0392b;
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-main: #2d3436;
+            --text-sub: #636e72;
+            --radius: 16px;
+        }
+
+        /* Base Reset */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding-bottom: 95px; /* Bottom Nav Space */
+            line-height: 1.65;
+        }
+
+        /* --- 1. Premium Header --- */
+        .header {
+            background: linear-gradient(145deg, #0b1e33 0%, #1e3c72 100%);
+            color: white;
+            padding: 20px 20px 35px;
+            border-bottom-left-radius: 30px;
+            border-bottom-right-radius: 30px;
+            box-shadow: 0 10px 25px rgba(0, 37, 77, 0.4);
+            position: relative;
+            z-index: 100;
+        }
+        
+        .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .app-brand h1 { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: 1.5px; }
+        .app-brand .badge { 
+            background: var(--gold); color: #00254d; 
+            padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; vertical-align: middle; 
+        }
+        .app-date { font-size: 0.8rem; opacity: 0.8; font-family: monospace; letter-spacing: 1px; margin-top: 5px; }
+
+        /* Exchange Rate & Weather Widget */
+        .status-bar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .status-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 12px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sc-icon { font-size: 1.5rem; color: var(--gold); }
+        .sc-info { display: flex; flex-direction: column; }
+        .sc-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; }
+        .sc-val { font-size: 1.1rem; font-weight: bold; color: white; }
+
+        /* --- 2. Map Container --- */
+        #map-wrapper {
+            position: relative;
+            margin: -30px 15px 15px;
+            height: 260px;
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            z-index: 101;
+            overflow: hidden;
+            border: 4px solid white;
+        }
+        #map { width: 100%; height: 100%; }
+
+        /* --- 3. Navigation Tabs --- */
+        .tabs-container {
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            padding: 10px 15px 15px;
+            z-index: 99;
+            overflow-x: auto;
+            white-space: nowrap;
+            display: flex;
+            gap: 12px;
+            -ms-overflow-style: none; scrollbar-width: none;
+        }
+        .tabs-container::-webkit-scrollbar { display: none; }
+
+        .tab-btn {
+            background: white;
+            color: var(--text-sub);
+            border: 1px solid #e1e4e8;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            flex-shrink: 0;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: var(--gold);
+            border-color: var(--primary);
+            box-shadow: 0 5px 15px rgba(0, 37, 77, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* --- 4. Content Area --- */
+        .content-container { padding: 0 15px; max-width: 900px; margin: auto; }
+
+        /* Flight Card */
+        .flight-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 25px;
+            border-top: 4px solid var(--gold);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .fc-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
+        .fc-logo { font-weight: 900; color: var(--primary); font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+        .fc-route { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
+        .fc-port { text-align: center; width: 30%; }
+        .fc-code { font-size: 1.8rem; font-weight: 800; color: var(--text-main); display: block; line-height: 1; }
+        .fc-time { font-size: 1rem; color: var(--primary-light); font-weight: bold; display: block; margin-top: 5px; }
+        .fc-mid { flex: 1; text-align: center; position: relative; }
+        .fc-mid::after { content: ''; position: absolute; top: 50%; left: 10%; right: 10%; height: 2px; background: #ddd; z-index: 1; }
+        .fc-icon { background: white; padding: 0 10px; position: relative; z-index: 2; color: var(--gold); font-size: 1.2rem; }
+
+        /* Spot Card */
+        .spot-card {
+            background: white;
+            border-radius: var(--radius);
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            overflow: hidden;
+            position: relative;
+        }
+        /* Card Sidebar Indicator */
+        .spot-card::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+            background: var(--primary);
+        }
+        .spot-card.highlight::before { background: var(--gold); }
+
+        .sc-header {
+            padding: 20px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+        .sc-main h3 { margin: 0; font-size: 1.35rem; color: var(--primary); font-weight: 800; }
+        .sc-tags { display: flex; gap: 8px; margin-top: 8px; }
+        .tag { font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: bold; background: #eee; color: #555; }
+        .tag.time { background: var(--primary); color: white; }
+        
+        .btn-nav-round {
+            background: #4285F4; color: white; width: 48px; height: 48px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-size: 1.4rem;
+            box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4); text-decoration: none; flex-shrink: 0;
+            transition: transform 0.2s;
+        }
+        .btn-nav-round:active { transform: scale(0.9); }
+
+        .sc-body { padding: 0 20px 25px; }
+        .sc-desc { color: var(--text-main); font-size: 0.95rem; margin-bottom: 20px; text-align: justify; }
+
+        /* Information Modules */
+        .module {
+            background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px;
+            padding: 15px; margin-bottom: 15px; position: relative;
+        }
+        .module-label {
+            font-size: 0.75rem; font-weight: 900; text-transform: uppercase; color: var(--text-sub);
+            letter-spacing: 1px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+        }
+        .module-content { font-size: 0.9rem; color: #444; }
+        .module-list { padding-left: 20px; margin: 5px 0 0; }
+        .module-list li { margin-bottom: 4px; }
+        
+        .transport-mod { background: #f0f7ff; border-color: #cce5ff; }
+        .transport-mod .module-label { color: #004085; }
+        
+        .culture-mod { background: #fffbe6; border-color: #fff3cd; }
+        .culture-mod .module-label { color: #856404; }
+
+        /* Recommendation Grid (Food/Shop) */
+        .rec-section { margin-top: 25px; border-top: 2px dashed #eee; padding-top: 15px; }
+        .rec-title { font-weight: 800; font-size: 0.9rem; color: var(--primary); margin-bottom: 12px; }
+        
+        .rec-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid #f1f1f1;
+        }
+        .rec-item:last-child { border-bottom: none; }
+        
+        .ri-details { flex: 1; padding-right: 15px; }
+        .ri-name { font-weight: 700; color: #2d3436; font-size: 0.95rem; display: block; }
+        .ri-note { font-size: 0.8rem; color: #888; display: block; margin-top: 2px; }
+        .ri-meta { font-size: 0.8rem; font-weight: bold; color: var(--accent); margin-top: 4px; display: block; }
+        
+        .btn-mini-map {
+            border: 1px solid #ddd; background: white; color: #4285F4;
+            padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold;
+            text-decoration: none; white-space: nowrap; display: flex; align-items: center; gap: 4px;
+        }
+
+        /* --- 5. Bottom Nav --- */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 80px;
+            background: white; border-top: 1px solid #eee;
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 1000; padding-bottom: env(safe-area-inset-bottom);
+        }
+        .bn-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 100%; height: 100%; color: #b2bec3; transition: 0.3s;
+        }
+        .bn-btn i { font-size: 1.4rem; margin-bottom: 4px; }
+        .bn-btn span { font-size: 0.7rem; font-weight: 600; }
+        .bn-btn.active { color: var(--primary); }
+        .bn-btn.active i { transform: translateY(-3px); color: var(--gold); }
+
+        /* Checklist */
+        .cl-container { display: none; padding: 20px; }
+        .cl-item {
+            background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .cl-checkbox { transform: scale(1.5); accent-color: var(--primary); }
+
+        /* Utility */
+        .loading { text-align: center; padding: 60px; color: #999; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-top">
+            <div class="app-brand">
+                <h1>FUKUOKA <span class="badge">PRO</span></h1>
+                <div class="app-date">2026.04.22 - 04.27 • STARLUX</div>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-card">
+                <i class="fas fa-yen-sign sc-icon"></i>
+                <div class="sc-info">
+                    <span class="sc-label">Cost (1 JPY)</span>
+                    <span class="sc-val" id="rate-cost">Loading</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <i class="fas fa-cloud-sun sc-icon"></i>
+                <div class="sc-info">
+                    <span class="sc-label">Fukuoka</span>
+                    <span class="sc-val" id="weather-temp">--°C</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Map -->
+    <div id="map-wrapper">
+        <div id="map"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-container" id="tabs">
+        <!-- JS Injected -->
+    </div>
+
+    <!-- Content -->
+    <main class="content-container">
+        <div id="itinerary-view">
+            <div class="loading"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>正在同步導航數據...</div>
+        </div>
+        
+        <div id="checklist-view" class="cl-container">
+            <!-- JS Injected -->
+        </div>
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav class="bottom-nav">
+        <div class="bn-btn active" onclick="switchView('itinerary', this)">
+            <i class="fas fa-map-signs"></i>
+            <span>行程</span>
+        </div>
+        <div class="bn-btn" onclick="switchView('checklist', this)">
+            <i class="fas fa-clipboard-list"></i>
+            <span>清單</span>
+        </div>
+        <div class="bn-btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+            <i class="fas fa-arrow-up"></i>
+            <span>頂部</span>
+        </div>
+    </nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // --- 1. THE DATA CORE (CONTENT RICHNESS) ---
+    const ITINERARY = [
+        {
+            day: 1, title: "Day 1: 星宇啟航", date: "4/22 (三)",
+            flight: {
+                exists: true, code: "JX840", airline: "STARLUX",
+                dep: "09:35 TPE", arr: "13:05 FUK",
+                note: "第一航廈 / 經濟艙提供胡同燒肉餐點"
+            },
+            spots: [
+                {
+                    name: "福岡機場 (FUK)",
+                    time: "13:05", stay: "60分", coords: [33.5859, 130.4501],
+                    desc: "抵達國際線航廈。出關後請先連上網路，準備移動。首要任務是前往國內線航廈轉乘地鐵。",
+                    nav: "福岡機場 國際線航廈",
+                    transport: {
+                        head: "免費接駁巴士",
+                        list: [
+                            "出大廳找【1號站牌】(藍色巴士)。",
+                            "車程約15分鐘，班距8-10分鐘。",
+                            "終點站下車即為地鐵入口。",
+                            "Tip: 若排隊人龍太長，建議直接搭計程車去博多站 (約¥1600)。"
+                        ]
+                    },
+                    culture: { head: "神機場", text: "福岡機場是全日本距離市中心最近的機場，從著陸到抵達博多車站，最快僅需30分鐘。" },
+                    food: [
+                        {n: "吉野家", note: "入境大廳最速選擇", p: "¥600", q: "吉野家 福岡空港国際線ターミナル店"},
+                        {n: "因幡烏龍麵", note: "國內線2F，博多軟烏龍麵始祖", p: "¥750", q: "因幡うどん 福岡空港店"}
+                    ], shop: []
+                },
+                {
+                    name: "JR 博多站",
+                    time: "15:00", stay: "90分", coords: [33.5897, 130.4207],
+                    desc: "九州交通樞紐。在此兌換 JR Pass 並購買路上補給品。",
+                    nav: "JR 博多站",
+                    transport: {
+                        head: "地鐵空港線",
+                        list: [
+                            "從機場國內線站搭乘，往【姪浜/唐津】方向。",
+                            "2站 (6分鐘) 於【博多站】下車。",
+                            "票價 ¥260 (可刷 IC 卡)。"
+                        ]
+                    },
+                    culture: { head: "兌換密技", text: "綠色窗口有兩個。千萬不要去「博多口」的，人超級多。請走去【筑紫口】(東側) 的窗口，排隊時間通常減半。" },
+                    food: [
+                        {n: "il FORNO del MIGNON", note: "站內現烤迷你可頌，巧克力必買", p: "¥400", q: "il FORNO del MIGNON Hakata"},
+                        {n: "駅弁屋", note: "推薦「かしわめし (雞肉飯)」便當", p: "¥1100", q: "駅弁屋 博多"}
+                    ], shop: []
+                },
+                {
+                    name: "稻佐山夜景",
+                    time: "18:30", stay: "120分", coords: [32.7533, 129.8517],
+                    desc: "搭乘纜車登頂，欣賞與香港、摩納哥並列的「世界新三大夜景」。",
+                    nav: "稻佐山展望台",
+                    transport: {
+                        head: "特急海鷗 + 巴士 + 纜車",
+                        list: [
+                            "博多搭特急至長崎 (約1.5hr)。",
+                            "長崎站前搭 3/4 號巴士至【淵神社】。",
+                            "轉乘長崎纜車 (往返¥1250)。"
+                        ]
+                    },
+                    culture: { head: "千萬美金", text: "長崎地形如缽，家家戶戶沿山坡而建，燈光層次感極強。地板藏有「心形燈石」，找到能帶來好運。" },
+                    food: [
+                        {n: "四海樓", note: "強棒麵發源地，建築如皇宮", p: "¥2500", q: "四海樓 長崎"},
+                        {n: "吉宗 本店", note: "150年老店，巨大茶碗蒸", p: "¥2800", q: "吉宗 本店"}
+                    ], shop: []
+                }
+            ]
+        },
+        {
+            day: 2, title: "Day 2: 枕頭與屋台", date: "4/23 (四)",
+            flight: { exists: false },
+            spots: [
+                {
+                    name: "眼鏡橋",
+                    time: "09:00", stay: "40分", coords: [32.7471, 129.8804],
+                    desc: "日本最古老石拱橋。尋找隱藏在堤防石牆中的「愛心石」。",
+                    nav: "眼鏡橋 長崎",
+                    transport: { head: "路面電車", list: ["搭乘藍線/黃線至【眼鏡橋】站。", "下車投幣 ¥140。"] },
+                    culture: { head: "戀愛聖地", text: "河堤旁約有20顆天然形成的心形石頭，觸摸可以提升戀愛運。" },
+                    food: [
+                        {n: "ツル茶ん", note: "九州最老喫茶店，土耳其飯", p: "¥1600", q: "ツル茶ん"},
+                        {n: "岩崎本舖", note: "角煮饅頭(刈包)，入口即化", p: "¥450", q: "岩崎本舖 本店"}
+                    ], shop: []
+                },
+                {
+                    name: "西川枕頭 (天神)",
+                    time: "17:30", stay: "90分", coords: [33.5890, 130.4005],
+                    desc: "前往天神的大丸百貨或三越，訂製專屬的「西川 (Nishikawa)」枕頭。",
+                    nav: "大丸福岡天神店",
+                    transport: {
+                        head: "地鐵 / 西鐵",
+                        list: [
+                            "從長崎返回博多後，搭地鐵至【天神】站。",
+                            "前往大丸百貨本館 (寢具樓層通常在高樓層)。"
+                        ]
+                    },
+                    culture: { 
+                        head: "Fit Labo 訂製流程", 
+                        text: "1. 測量頸部曲線 (10分)。2. 挑選材質(軟硬)。3. 試躺並微調高度 (30分)。4. 製作 (30-60分)。建議預留充裕時間。結帳時記得出示護照辦理退稅。" 
+                    },
+                    food: [], 
+                    shop: [
+                        {n: "西川枕頭", note: "大丸百貨 6F / 三越 8F", p: "¥25000~", q: "大丸福岡天神店 西川"}
+                    ]
+                },
+                {
+                    name: "中洲屋台街",
+                    time: "19:30", stay: "120分", coords: [33.5916, 130.4042],
+                    desc: "福岡獨有的夜間風景。那珂川畔的紅色燈籠，是博多夜晚的靈魂。",
+                    nav: "中洲屋台",
+                    transport: { head: "步行", list: ["從天神大丸百貨步行約 10 分鐘即可抵達春吉橋一帶的屋台區。"] },
+                    culture: { head: "屋台潛規則", text: "1. 請先點飲料。2. 未標價的店要小心。3. 不要佔位滑手機。4. 廁所請先在附近的便利商店或車站解決。" },
+                    food: [
+                        {n: "小金ちゃん", note: "炒拉麵發源地，排隊名店", p: "¥800", q: "小金ちゃん"},
+                        {n: "一龍", note: "豚骨拉麵，湯頭濃郁", p: "¥900", q: "一龍 屋台"}
+                    ], shop: []
+                }
+            ]
+        },
+        {
+            day: 3, title: "Day 3: 紫藤自駕", date: "4/24 (五)",
+            flight: { exists: false },
+            spots: [
+                {
+                    name: "河內藤園",
+                    time: "10:00", stay: "120分", coords: [33.8315, 130.7937],
+                    desc: "CNN評選世界最美31景。夢幻的漸層紫藤花隧道。",
+                    nav: "河內藤園",
+                    transport: {
+                        head: "租車自駕",
+                        list: [
+                            "MapCode: 16 275 087*55",
+                            "從博多出發約1小時車程。",
+                            "⚠️ 4月底花季必須事前在超商購買入園預約券！"
+                        ]
+                    },
+                    culture: { head: "色彩魔法", text: "園內有22種紫藤，從白色、粉紅到深紫，開花時間略有不同，形成了天然的漸層隧道。" },
+                    food: [
+                        {n: "資さんうどん", note: "路過必吃，北九州靈魂烏龍麵", p: "¥800", q: "資さんうどん"},
+                        {n: "自備輕食", note: "園區周邊無餐廳，建議買飯糰", p: "¥500", q: ""}
+                    ], shop: []
+                },
+                {
+                    name: "門司港懷舊區",
+                    time: "13:30", stay: "180分", coords: [33.9452, 130.9616],
+                    desc: "大正浪漫風格的港口。參觀舊門司三井俱樂部等歐式建築。",
+                    nav: "門司港懷舊區",
+                    transport: { head: "自駕", list: ["從藤園開車約40分鐘。", "港區有大型停車場 (海峽廣場旁)。"] },
+                    culture: { head: "香蕉叫賣", text: "昔日台灣香蕉運抵日本的卸貨港。為了處理過熟香蕉發展出叫賣文化。記得找黃色的「香蕉人」合照！" },
+                    food: [
+                        {n: "Bear Fruits", note: "上戶彩推薦燒咖哩，起司牽絲", p: "¥1600", q: "Bear Fruits 本店"},
+                        {n: "伽哩本舗", note: "舊洋行建築內用餐，海鮮燒咖哩", p: "¥1500", q: "伽哩本舗 門司港"}
+                    ], 
+                    shop: [
+                        {n: "螺絲巧克力", note: "由巧克力製成的螺絲，真的可以鎖", p: "¥800", q: "ネジチョコ 門司港"}
+                    ]
+                }
+            ]
+        },
+        {
+            day: 4, title: "Day 4: 古都茶香", date: "4/25 (六)",
+            flight: { exists: false },
+            spots: [
+                {
+                    name: "太宰府天滿宮",
+                    time: "09:00", stay: "120分", coords: [33.5215, 130.5349],
+                    desc: "學問之神總本宮。參道上有許多梅枝餅店與隈研吾設計的星巴克。",
+                    nav: "太宰府天滿宮",
+                    transport: { head: "西鐵電車", list: ["天神站搭特急至【二日市】。", "轉乘太宰府線至【太宰府】。", "運氣好可搭到直達的「旅人號」。"] },
+                    culture: { head: "飛梅傳說", text: "本殿旁的梅樹據說是因為太思念主人(菅原道真)，一夜之間從京都飛過來的。" },
+                    food: [
+                        {n: "一蘭拉麵", note: "限定「五角碗」(合格)，麵條特長", p: "¥980", q: "一蘭 太宰府参道店"},
+                        {n: "かさの家", note: "梅枝餅名店，現烤外皮酥脆", p: "¥150", q: "かさの家"}
+                    ], shop: [{n: "學業御守", note: "日本最靈驗的考試御守", p: "¥800", q: "太宰府天滿宮 社務所"}]
+                },
+                {
+                    name: "八女福島白壁",
+                    time: "13:00", stay: "150分", coords: [33.2081, 130.5562],
+                    desc: "日本第一玉露茶產地。漫步於江戶時代的白壁街道。",
+                    nav: "八女福島",
+                    transport: { head: "巴士", list: ["西鐵二日市 ➜ 西鐵久留米。", "轉乘堀川巴士(往八女) ➜ 【八女福島】下車。"] },
+                    culture: { head: "玉露之王", text: "八女茶在日本茶評鑑會連年奪冠。這裡的「玉露」沖泡溫度低(約50-60度)，口感甘甜如高湯。" },
+                    food: [
+                        {n: "八女茶寮", note: "品嚐正宗玉露與和菓子", p: "¥1200", q: "八女茶寮"},
+                        {n: "ao cafe", note: "古民家改建的網美咖啡廳", p: "¥1000", q: "ao cafe 八女"}
+                    ], shop: [{n: "八女茶葉", note: "送禮首選，包裝精美", p: "¥1500", q: "八女茶 伴手禮"}]
+                }
+            ]
+        },
+        {
+            day: 5, title: "Day 5: 光之道", date: "4/26 (日)",
+            flight: { exists: false },
+            spots: [
+                {
+                    name: "宮地嶽神社",
+                    time: "09:30", stay: "90分", coords: [33.7808, 130.4851],
+                    desc: "擁有日本第一大注連繩，以及通往大海的筆直參道「光之道」。",
+                    nav: "宮地嶽神社",
+                    transport: { head: "JR + 巴士", list: ["博多搭 JR 至【福間站】。", "轉乘西鐵巴士 (1-1或1-2) 至【宮地嶽神社前】。"] },
+                    culture: { head: "嵐的聖地", text: "因偶像團體「嵐」拍攝JAL廣告而爆紅。注連繩重達3噸，需1500人合力更換。" },
+                    food: [
+                        {n: "松ヶ枝餅", note: "表面烙有松樹圖案，比梅枝餅脆", p: "¥150", q: "宮地嶽神社 参道"},
+                        {n: "海鮮丼", note: "福間海岸海景餐廳", p: "¥1800", q: "福間海岸 海鮮"}
+                    ], shop: []
+                },
+                {
+                    name: "海之中道公園",
+                    time: "13:00", stay: "240分", coords: [33.6596, 130.3622],
+                    desc: "廣大的國營公園。春天有藍色粉蝶花海，動物之森可摸水豚。",
+                    nav: "海之中道海濱公園",
+                    transport: { head: "JR香椎線", list: ["從福間站搭JR至【香椎】轉車。", "搭乘香椎線至【海之中道】站下車即達。"] },
+                    culture: { head: "生存攻略", text: "公園大到走不完。入園第一件事絕對是「租腳踏車」(¥700/日)。" },
+                    food: [
+                        {n: "藍色霜淇淋", note: "粉蝶花口味(蘇打味)", p: "¥400", q: "海之中道海濱公園"},
+                        {n: "とりかわ粋恭", note: "晚餐：博多名物雞皮串燒", p: "¥3000", q: "とりかわ粋恭"},
+                        {n: "ShinShin", note: "晚餐：安室奈美惠最愛的拉麵", p: "¥900", q: "ShinShin 天神本店"}
+                    ], shop: []
+                }
+            ]
+        },
+        {
+            day: 6, title: "Day 6: 星宇返航", date: "4/27 (一)",
+            flight: {
+                exists: true, code: "JX841", airline: "STARLUX",
+                dep: "14:15 FUK", arr: "15:45 TPE",
+                note: "請務必提前2小時抵達機場"
+            },
+            spots: [
+                {
+                    name: "天神地下街",
+                    time: "09:00", stay: "120分", coords: [33.5902, 130.4190],
+                    desc: "19世紀歐洲風格的絕美地下街，最後掃貨衝刺。",
+                    nav: "天神地下街",
+                    transport: { head: "步行/地鐵", list: ["連接地鐵天神站。", "建議將行李寄放在車站置物櫃。"] },
+                    culture: { head: "廁所藝廊", text: "地下街的廁所是著名打卡點。每一區都有不同主題，如英式書房、高級香水瓶等。" },
+                    food: [
+                        {n: "たんやHAKATA", note: "博多一番街超人氣牛舌早餐", p: "¥1800", q: "たんやHAKATA"},
+                        {n: "Bills", note: "澳洲來的世界第一早餐鬆餅", p: "¥2500", q: "Bills 福岡"}
+                    ], 
+                    shop: [
+                        {n: "博多通饅頭", note: "必買伴手禮No.1", p: "¥1500", q: "博多通りもん"},
+                        {n: "明太子軟管", note: "福太郎出品，擠在麵包上超方便", p: "¥600", q: "福太郎 天神"}
+                    ]
+                },
+                {
+                    name: "福岡機場 (FUK)",
+                    time: "12:15", stay: "120分", coords: [33.5859, 130.4501],
+                    desc: "前往國際線航廈辦理登機。安檢通常大排長龍，務必提早抵達。",
+                    nav: "福岡機場 國際線航廈",
+                    transport: { head: "地鐵 + 接駁車", list: ["地鐵至【福岡空港】站。", "轉乘接駁巴士至國際線航廈 (預留20分鐘)。"] },
+                    culture: { head: "免稅店攻略", text: "過安檢後的免稅店雖然不大，但白色戀人、薯條三兄弟、Royce巧克力都有賣。" },
+                    food: [], 
+                    shop: [
+                        {n: "一蘭泡麵", note: "福岡限定釜醬汁口味", p: "¥2000", q: "一蘭 福岡空港"},
+                        {n: "Royce生巧", note: "需加購保冷袋 (¥100)", p: "¥800", q: "Fukuoka Airport Duty Free"}
+                    ]
+                }
+            ]
+        }
+    ];
+
+    const CHECKLIST = [
+        "護照 (效期6個月以上)", "台灣駕照正本 (自駕日必備)", "駕照日文譯本 (自駕日必備)",
+        "JR Pass 兌換券", "日圓現金 (建議¥30,000以上)", "信用卡 (JCB/Visa 建議兩張)",
+        "eSIM / 網卡", "行動電源", "常備藥品", "牙刷 (日本旅館多不主動提供)"
+    ];
+
+    // --- 2. LOGIC ---
+    let map, markers = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initMap();
+        renderTabs();
+        renderItinerary(0);
+        renderChecklist();
+        fetchData();
+    });
+
+    function initMap() {
+        // Standard Colorful OpenStreetMap
+        map = L.map('map', {zoomControl: false}).setView([33.5902, 130.4017], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+    }
+
+    function updateMap(dayIndex) {
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+        const group = new L.featureGroup();
+        
+        ITINERARY[dayIndex].spots.forEach((spot, i) => {
+            // Numbered Colorful Icon
+            const iconHtml = `<div style="background:${i===0?'#c0392b':'#00254d'}; color:white; width:30px; height:30px; border-radius:50%; text-align:center; line-height:26px; font-weight:bold; border:2px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.3); font-size:14px;">${i+1}</div>`;
+            const icon = L.divIcon({ className: 'custom-pin', html: iconHtml, iconSize: [30, 30] });
+            const m = L.marker(spot.coords, {icon: icon}).addTo(map);
+            markers.push(m);
+            group.addLayer(m);
+        });
+        
+        if (markers.length) map.fitBounds(group.getBounds(), {padding: [50, 50]});
+    }
+
+    function renderTabs() {
+        const container = document.getElementById('tabs');
+        container.innerHTML = ITINERARY.map((day, i) => `
+            <button class="tab-btn ${i===0?'active':''}" onclick="switchDay(${i}, this)">
+                ${day.title.split(':')[0]}
+            </button>
+        `).join('');
+    }
+
+    function switchDay(index, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderItinerary(index);
+    }
+
+    function renderItinerary(index) {
+        updateMap(index);
+        const container = document.getElementById('itinerary-view');
+        const day = ITINERARY[index];
+        
+        let html = `
+            <div style="padding:10px 0 20px;">
+                <h2 style="color:var(--primary); margin:0; font-size:1.8rem;">${day.title}</h2>
+                <div style="color:var(--text-sub); font-size:0.9rem; margin-top:5px;">${day.date}</div>
+            </div>
+        `;
+
+        if (day.flight.exists) {
+            html += `
+            <div class="flight-card">
+                <div class="fc-header">
+                    <div class="fc-logo"><i class="fas fa-plane"></i> ${day.flight.airline}</div>
+                    <div style="font-weight:bold; color:#555;">${day.flight.code}</div>
+                </div>
+                <div class="fc-route">
+                    <div class="fc-port">
+                        <span class="fc-code">${day.flight.dep.split(' ')[0]}</span>
+                        <span class="fc-time">${day.flight.dep.split(' ')[1]}</span>
+                    </div>
+                    <div class="fc-mid">
+                        <i class="fas fa-plane fc-icon"></i>
+                    </div>
+                    <div class="fc-port">
+                        <span class="fc-code">${day.flight.arr.split(' ')[0]}</span>
+                        <span class="fc-time">${day.flight.arr.split(' ')[1]}</span>
+                    </div>
+                </div>
+                <div style="font-size:0.8rem; color:#888; text-align:center; background:#f9f9f9; padding:5px; border-radius:4px;">${day.flight.note}</div>
+            </div>`;
+        }
+
+        html += day.spots.map((spot, i) => {
+            // Highlight Nishikawa Card
+            const isHighlight = spot.name.includes("西川");
+
+            // Rec Lists
+            const renderRecs = (items, icon, title) => {
+                if(!items || items.length === 0) return '';
+                return `
+                <div class="rec-section">
+                    <div class="rec-title"><i class="fas ${icon}"></i> ${title}</div>
+                    ${items.map(item => `
+                        <div class="rec-item">
+                            <div class="ri-details">
+                                <span class="ri-name">${item.n}</span>
+                                <span class="ri-note">${item.note}</span>
+                                <span class="ri-meta">${item.p}</span>
+                            </div>
+                            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.q)}" target="_blank" class="btn-mini-map">
+                                GO <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                    `).join('')}
+                </div>`;
+            };
+
+            return `
+            <div class="spot-card ${isHighlight ? 'highlight' : ''}">
+                <div class="sc-header">
+                    <div class="sc-main">
+                        <h3>${spot.name}</h3>
+                        <div class="sc-tags">
+                            <span class="tag time"><i class="far fa-clock"></i> ${spot.time}</span>
+                            <span class="tag">停留 ${spot.stay}</span>
+                        </div>
+                    </div>
+                    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.nav)}" target="_blank" class="btn-nav-round">
+                        <i class="fas fa-location-arrow"></i>
+                    </a>
+                </div>
+                <div class="sc-body">
+                    <div class="sc-desc">${spot.desc}</div>
+                    
+                    <div class="module transport-mod">
+                        <div class="module-label"><i class="fas fa-subway"></i> 交通防呆</div>
+                        <div class="module-content">
+                            <strong>${spot.transport.head}</strong>
+                            <ul class="module-list">
+                                ${spot.transport.list.map(l => `<li>${l}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="module culture-mod">
+                        <div class="module-label"><i class="fas fa-lightbulb"></i> 老司機筆記</div>
+                        <div class="module-content">
+                            <strong>${spot.culture.head}</strong>
+                            <p style="margin:5px 0 0;">${spot.culture.text}</p>
+                        </div>
+                    </div>
+
+                    ${renderRecs(spot.food, 'fa-utensils', '必吃美食 (點擊導航)')}
+                    ${renderRecs(spot.shop, 'fa-shopping-bag', '必買清單 (點擊導航)')}
+                </div>
+            </div>`;
+        }).join('');
+        
+        container.innerHTML = html;
+        window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function renderChecklist() {
+        const container = document.getElementById('checklist-view');
+        container.innerHTML = CHECKLIST.map(item => `
+            <label class="cl-item">
+                <input type="checkbox" class="cl-checkbox">
+                <span style="font-weight:500; color:#444;">${item}</span>
+            </label>
+        `).join('');
+    }
+
+    function switchView(view, btn) {
+        document.getElementById('itinerary-view').style.display = view==='itinerary'?'block':'none';
+        document.getElementById('checklist-view').style.display = view==='checklist'?'block':'none';
+        
+        // Map Toggle
+        const mapW = document.getElementById('map-wrapper');
+        const tabs = document.getElementById('tabs');
+        if(view==='itinerary') {
+            mapW.style.display = 'block';
+            tabs.style.display = 'flex';
+            setTimeout(() => map.invalidateSize(), 100);
+        } else {
+            mapW.style.display = 'none';
+            tabs.style.display = 'none';
+        }
+
+        document.querySelectorAll('.bn-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        window.scrollTo(0,0);
+    }
+
+    async function fetchData() {
+        try {
+            // Exchange Rate: 1 JPY = ? TWD (Cost View)
+            const res = await fetch('https://api.exchangerate-api.com/v4/latest/TWD');
+            const data = await res.json();
+            const jpyToTwd = (1 / data.rates.JPY).toFixed(3);
+            document.getElementById('rate-cost').innerText = `1 JPY ≈ ${jpyToTwd} TWD`;
+        } catch {
+            document.getElementById('rate-cost').innerText = "0.22";
+        }
+
+        try {
+            // Weather
+            const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=33.59&longitude=130.40&current_weather=true');
+            const data = await res.json();
+            document.getElementById('weather-temp').innerText = `${data.current_weather.temperature}°C`;
+        } catch {
+            document.getElementById('weather-temp').innerText = "20°C";
+        }
+    }
+</script>
+</body>
+</html>
